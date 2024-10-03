@@ -1,10 +1,17 @@
-name: Build, Release, and Docker
+name: Build and Release
 
 on:
   pull_request:
     branches: [main]  # Adjust this if your main branch has a different name
   release:
     types: [created]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Create a release'
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   build:
@@ -20,12 +27,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v2
         with:
-          go-version: 'stable'
+          go-version: '1.21'  # Adjust this to your Go version
 
       - name: Build cmd_server
         run: |
@@ -38,7 +45,7 @@ jobs:
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ../cmd_worker-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2
         with:
           name: binaries-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
@@ -48,67 +55,28 @@ jobs:
   release:
     name: Release
     needs: build
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.release == 'true')
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v2
+
+      - name: Create Release
+        if: github.event_name == 'workflow_dispatch'
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: manual-release-${{ github.run_number }}
+          release_name: Manual Release ${{ github.run_number }}
+          draft: false
+          prerelease: false
 
       - name: Release binaries
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
         with:
           files: binaries-*/*
-
-  docker:
-    name: Build and Push Docker Images
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    strategy:
-      matrix:
-        include:
-          - dockerfile: Dockerfile.cmd_server
-            image: ghcr.io/${{ github.repository }}/cmd_server
-          - dockerfile: Dockerfile.cmd_worker
-            image: ghcr.io/${{ github.repository }}/cmd_worker
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ matrix.image }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name == 'release' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tag_name: ${{ github.event.release.tag_name || steps.create_release.outputs.tag_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
