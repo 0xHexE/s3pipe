@@ -27,10 +27,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
           go-version: '1.21'  # Adjust this to your Go version
 
@@ -59,7 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
 
       - name: Create Release
         if: github.event_name == 'workflow_dispatch'
@@ -74,7 +74,7 @@ jobs:
           prerelease: false
 
       - name: Release binaries
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: binaries-*/*
           tag_name: ${{ github.event.release.tag_name || steps.create_release.outputs.tag_name }}
