@@ -1,9 +1,8 @@
 go 1.23.0
 
 use (
-	./cmd_worker
 	./cmd_server
+	./cmd_worker
 	./s3pipe_client
 	./torrent_downloader
-	server
 )
