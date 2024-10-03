@@ -52,34 +52,6 @@ jobs:
             cmd_server-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
             cmd_worker-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
 
-  release:
-    name: Release
-    needs: build
-    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.release == 'true')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-
-      - name: Create Release
-        if: github.event_name == 'workflow_dispatch'
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: manual-release-${{ github.run_number }}
-          release_name: Manual Release ${{ github.run_number }}
-          draft: false
-          prerelease: false
-
-      - name: Release binaries
-        uses: softprops/action-gh-release@v2
-        with:
-          files: binaries-*/*
-          tag_name: ${{ github.event.release.tag_name || steps.create_release.outputs.tag_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   docker:
     name: Build and Push Docker Images
     needs: build
