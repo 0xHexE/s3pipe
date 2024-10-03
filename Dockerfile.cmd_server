@@ -2,19 +2,16 @@
 FROM golang:1.23-alpine AS builder
 
 # Set the working directory inside the container
-WORKDIR /app
+WORKDIR /go/src/app
 
-# Copy go mod and sum files
-COPY go.mod go.sum ./
+# Copy the entire workspace
+COPY . .
 
 # Download all dependencies
 RUN go mod download
 
-# Copy the source code into the container
-COPY . .
-
-# Build the application
-RUN go build -o /app/cmd_server ./cmd_server
+# Build the application from the cmd_server directory
+RUN cd cmd_server && go build -o /go/bin/cmd_server
 
 # Use a smaller base image for the final stage
 FROM alpine:latest
@@ -23,7 +20,7 @@ FROM alpine:latest
 WORKDIR /root/
 
 # Copy the binary from the builder stage
-COPY --from=builder /app/cmd_server .
+COPY --from=builder /go/bin/cmd_server .
 
 # Command to run the executable
 CMD ["./cmd_server"]
