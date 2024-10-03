@@ -1,0 +1,82 @@
+{
+    # Global options
+    admin off  # Disable admin API for security
+
+    # Disable the "Server" header
+    servers {
+        protocols h1 h2 h2c
+    }
+}
+
+{$DOMAIN} {
+    @hash_path {
+        path_regexp ^/([a-fA-F0-9]{40})(/.*)?$
+    }
+
+    handle @hash_path {
+        root * {$ROOT_FOLDER}
+
+        # Enable directory listing (optional, remove if not needed)
+        file_server {
+            browse
+        }
+
+        # Optimize for video streaming
+        header {
+            # Enable partial content for seeking
+            Accept-Ranges bytes
+            # Cache control (adjust max-age as needed)
+            Cache-Control "public, max-age=3600"
+        }
+
+        # Handle common video formats
+        @video_files path *.mp4 *.webm *.ogg *.m4v *.mov *.mkv *.avi *.flv *.wmv
+
+        handle @video_files {
+            # Set appropriate MIME types
+
+            # Enable byte range requests for seeking
+            header Accept-Ranges bytes
+
+            # Disable compression for video files
+            encode gzip zstd
+        }
+
+        # Enable partial responses for video seeking
+        @range_requests header_regexp Range .*
+        handle @range_requests {
+            header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate"
+            header Pragma no-cache
+        }
+    }
+
+    handle {
+        respond "Access denied" 403
+    }
+
+    # Enable logging
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+
+    # Enable compression for non-video files
+    @non_video_files not path *.mp4 *.webm *.ogg *.m4v *.mov *.mkv *.avi *.flv *.wmv
+    handle @non_video_files {
+        encode gzip zstd
+    }
+
+    # Set security headers
+    header {
+        # Enable HTTP Strict Transport Security (HSTS)
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        # Disable content-type sniffing
+        X-Content-Type-Options "nosniff"
+        # Prevent clickjacking
+        X-Frame-Options "DENY"
+        # Enable referrer policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # Remove the Server header
+        -Server
+    }
+}

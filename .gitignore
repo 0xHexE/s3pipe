@@ -1,0 +1,5 @@
+downloaded_files
+*.db
+.env
+.idea
+cmd_worker/downloader_config.yaml
